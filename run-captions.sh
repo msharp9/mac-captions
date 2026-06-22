@@ -18,4 +18,4 @@ swiftc Sources/CaptionOverlay/main.swift \
     -framework AppKit
 
 echo "Starting pipeline — speak English, see Spanish captions. Ctrl+C to stop."
-uv run mac-captions | .build/caption-overlay
+PYTHONPATH=src uv run python -m mac_captions.live | .build/caption-overlay

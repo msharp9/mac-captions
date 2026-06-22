@@ -126,3 +126,7 @@ def run() -> None:
             _segmenter_loop(model, frame_queue)
     except KeyboardInterrupt:
         print("\nStopped.", file=sys.stderr, flush=True)
+
+
+if __name__ == "__main__":
+    run()
