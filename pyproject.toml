@@ -1,0 +1,44 @@
+[project]
+name = "mac-captions"
+version = "0.1.0"
+description = "Live English speech → Spanish captions on macOS using Granite Speech 4.1 and MLX"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "mlx-audio>=0.4.1",
+    "sounddevice",
+    "webrtcvad-wheels",
+    "numpy",
+]
+
+[project.scripts]
+mac-captions = "mac_captions.live:run"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.12",
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+minversion = "6.0"
+addopts = "--cov=src --cov-report=term-missing"
+testpaths = [
+    "tests",
+]
+
+[tool.coverage.run]
+omit = [
+    "src/mac_captions/live.py",  # requires Apple Silicon mic + GPU; not CI-testable
+]
+
+[tool.coverage.report]
+fail_under = 80

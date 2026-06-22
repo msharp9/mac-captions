@@ -1,0 +1,5 @@
+# Changes here will be overwritten by Copier
+_commit: v0.1.2
+_src_path: gh:msharp9/copy-pasta
+description: Automatically display captions and subtitles at the bottom of your mac
+name: mac-captions
