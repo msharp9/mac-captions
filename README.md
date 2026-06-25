@@ -25,7 +25,7 @@ uv sync
 ./run-captions.sh
 ```
 
-The first run downloads the Granite model weights (~2 GB) and caches them locally. Subsequent runs are instant.
+The first run downloads the Granite model weights (~2 GB) and caches them locally. After that, the app starts instantly and works fully offline — it never phones home on startup. To check for a model update: `MAC_CAPTIONS_UPDATE=1 ./run-captions.sh`.
 
 Grant the microphone permission when macOS prompts you (one-time).
 

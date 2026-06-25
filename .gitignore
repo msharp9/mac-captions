@@ -176,6 +176,9 @@ plan/
 # Models
 models/
 
+# Local planning docs
+PLAN-*.md
+
 # Project-specific
 .claude/
 .build/

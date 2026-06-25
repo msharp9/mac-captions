@@ -14,12 +14,15 @@ Or run standalone to see raw text output:
 
 from __future__ import annotations
 
+import os
 import queue
 import sys
 
 import numpy as np
 import sounddevice as sd
 import webrtcvad
+from huggingface_hub import snapshot_download
+from huggingface_hub.errors import LocalEntryNotFoundError
 from mlx_audio.stt.utils import load_model
 
 from mac_captions.pipeline import (
@@ -35,13 +38,59 @@ from mac_captions.pipeline import (
 MODEL_ID = "ibm-granite/granite-speech-4.1-2b"
 LANGUAGE = "es"  # target translation language
 
+# ---------------------------------------------------------------------------
+# Model resolution
+#
+# Default (cache-first): start instantly from the locally cached weights on
+# every run — never blocks on the network.
+#
+# To check Hugging Face for an updated model revision:
+#   MAC_CAPTIONS_UPDATE=1 ./run-captions.sh
+# ---------------------------------------------------------------------------
+
+
+def _resolve_model_path() -> str:
+    """Return a local path to the cached model, downloading only when needed.
+
+    By default the cache is always used directly so startup is instant and
+    works with no internet.  Set MAC_CAPTIONS_UPDATE=1 to force an online
+    update check (falls back to cache within ~5 s if the network is slow).
+    """
+    update = os.environ.get("MAC_CAPTIONS_UPDATE") not in (None, "", "0")
+
+    if not update:
+        try:
+            return snapshot_download(MODEL_ID, local_files_only=True)
+        except LocalEntryNotFoundError:
+            print(
+                "Model not cached — downloading once (~2 GB). Needs internet…",
+                file=sys.stderr,
+                flush=True,
+            )
+
+    # Either an explicit update was requested, or nothing is cached yet.
+    try:
+        if update:
+            print("Checking Hugging Face for model updates…", file=sys.stderr, flush=True)
+        return snapshot_download(MODEL_ID, etag_timeout=5)
+    except LocalEntryNotFoundError:
+        print(
+            f"ERROR: model '{MODEL_ID}' is not cached and Hugging Face is unreachable.\n"
+            "Connect to the internet once to download the model (~2 GB); "
+            "after that it runs fully offline.",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(1)
+
 
 # ---------------------------------------------------------------------------
 # Model loading
 # ---------------------------------------------------------------------------
 def _load() -> object:
+    model_path = _resolve_model_path()
     print(f"Loading model {MODEL_ID} …", file=sys.stderr, flush=True)
-    model = load_model(MODEL_ID)
+    model = load_model(model_path)
     print("Model ready. Listening…", file=sys.stderr, flush=True)
     return model
 
