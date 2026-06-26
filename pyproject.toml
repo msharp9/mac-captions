@@ -1,14 +1,26 @@
 [project]
 name = "mac-captions"
 version = "0.1.0"
-description = "Live English speech → Spanish captions on macOS using Granite Speech 4.1 and MLX"
+description = "Live English speech → Spanish captions on macOS using Granite Speech 4.1 (MLX on Apple Silicon, transformers/PyTorch on Intel)"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "mlx-audio>=0.4.1",
     "sounddevice",
     "webrtcvad-wheels",
-    "numpy",
+    # MLX backend — Apple Silicon (arm64) only
+    "mlx-audio>=0.4.1 ; platform_machine == 'arm64'",
+    # transformers (PyTorch) backend — cross-platform: Intel + Apple Silicon CPU
+    "transformers>=4.52",
+    "soundfile",
+    # Apple Silicon: latest torch/torchaudio (no version pin needed)
+    "torch ; platform_machine == 'arm64'",
+    "torchaudio ; platform_machine == 'arm64'",
+    # Intel macOS: last torch/torchaudio versions with x86_64 wheels are 2.2.2
+    "torch==2.2.2 ; platform_machine == 'x86_64'",
+    "torchaudio==2.2.2 ; platform_machine == 'x86_64'",
+    # torch 2.2.x predates the NumPy 2 ABI; pin <2 on Intel to avoid a runtime crash
+    "numpy ; platform_machine == 'arm64'",
+    "numpy<2 ; platform_machine == 'x86_64'",
 ]
 
 [project.scripts]
@@ -37,7 +49,9 @@ testpaths = [
 
 [tool.coverage.run]
 omit = [
-    "src/mac_captions/live.py",  # requires Apple Silicon mic + GPU; not CI-testable
+    "src/mac_captions/live.py",  # requires mic + GPU; not CI-testable
+    # backends.py is included in coverage — MlxBackend/TransformersBackend use
+    # '# pragma: no cover' individually; detect_backend() is tested via test_backends.py
 ]
 
 [tool.coverage.report]

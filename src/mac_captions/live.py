@@ -2,14 +2,21 @@
 Live English → Spanish caption pipeline.
 
 Captures microphone audio, detects speech segments via WebRTC VAD, translates
-each segment using Granite Speech 4.1 via mlx-audio, and writes one caption
-line per segment to stdout.
+each segment using Granite Speech 4.1 (auto-selects MLX on Apple Silicon or
+HuggingFace transformers on Intel), and writes one caption line per segment
+to stdout.
 
 Pipe into the Swift caption overlay:
     mac-captions | ./.build/caption-overlay
 
 Or run standalone to see raw text output:
     mac-captions
+
+The backend is chosen automatically:
+  - Apple Silicon (arm64): mlx-audio (fastest, GPU-accelerated)
+  - Intel / other:         transformers + PyTorch CPU
+
+Override with: MAC_CAPTIONS_BACKEND=mlx|transformers
 """
 
 from __future__ import annotations
@@ -23,8 +30,8 @@ import sounddevice as sd
 import webrtcvad
 from huggingface_hub import snapshot_download
 from huggingface_hub.errors import LocalEntryNotFoundError
-from mlx_audio.stt.utils import load_model
 
+from mac_captions.backends import load_backend
 from mac_captions.pipeline import (
     FRAME_BYTES,
     FRAME_SAMPLES,
@@ -32,11 +39,9 @@ from mac_captions.pipeline import (
     VAD_AGGRESSIVENESS,
     VadSegmenter,
     chunk_audio,
-    postprocess_text,
 )
 
 MODEL_ID = "ibm-granite/granite-speech-4.1-2b"
-LANGUAGE = "es"  # target translation language
 
 # ---------------------------------------------------------------------------
 # Model resolution
@@ -85,29 +90,14 @@ def _resolve_model_path() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Model loading
+# VAD segmenter loop
+#
+# For the MLX backend: model loading and generate() must run on the same
+# thread (MLX GPU stream constraint).  We satisfy this by calling load_backend()
+# inside the sd.RawInputStream context and running _segmenter_loop on the same
+# thread.  The transformers backend has no such constraint but is unaffected.
 # ---------------------------------------------------------------------------
-def _load() -> object:
-    model_path = _resolve_model_path()
-    print(f"Loading model {MODEL_ID} …", file=sys.stderr, flush=True)
-    model = load_model(model_path)
-    print("Model ready. Listening…", file=sys.stderr, flush=True)
-    return model
-
-
-# ---------------------------------------------------------------------------
-# Translation
-# ---------------------------------------------------------------------------
-def _translate(model, pcm_int16: np.ndarray) -> str:  # noqa: ANN001
-    audio_f32 = pcm_int16.astype(np.float32) / 32768.0
-    out = model.generate(audio_f32, language=LANGUAGE, temperature=0.0, max_tokens=100, verbose=False)
-    return postprocess_text(out.text)
-
-
-# ---------------------------------------------------------------------------
-# VAD segmenter loop (must run on same thread as model load — MLX GPU stream)
-# ---------------------------------------------------------------------------
-def _segmenter_loop(model, frame_queue: queue.Queue) -> None:  # noqa: ANN001
+def _segmenter_loop(backend, frame_queue: queue.Queue) -> None:  # noqa: ANN001
     vad = webrtcvad.Vad(VAD_AGGRESSIVENESS)
     segmenter = VadSegmenter()
     segment_n = 0
@@ -133,7 +123,7 @@ def _segmenter_loop(model, frame_queue: queue.Queue) -> None:  # noqa: ANN001
 
         try:
             audio = np.frombuffer(pcm, dtype=np.int16)
-            text = _translate(model, audio)
+            text = backend.translate(audio)
             if text:
                 try:
                     print(text, flush=True)
@@ -170,9 +160,9 @@ def run() -> None:
             channels=1,
             callback=audio_callback,
         ):
-            # Model loading and generate() must share the same thread (MLX GPU stream)
-            model = _load()
-            _segmenter_loop(model, frame_queue)
+            # Load the model on this thread (required by the MLX GPU stream constraint).
+            backend = load_backend(_resolve_model_path())
+            _segmenter_loop(backend, frame_queue)
     except KeyboardInterrupt:
         print("\nStopped.", file=sys.stderr, flush=True)
 

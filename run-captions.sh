@@ -6,7 +6,12 @@
 #
 # Requirements:
 #   - uv venv set up:  uv sync
-#   - macOS with Apple Silicon (M-series) and a microphone
+#   - macOS (Apple Silicon or Intel) with a microphone
+#
+# Backend is chosen automatically:
+#   - Apple Silicon (arm64): mlx-audio  (GPU-accelerated)
+#   - Intel (x86_64):        transformers + PyTorch CPU  (slower, but works)
+# Override:  MAC_CAPTIONS_BACKEND=mlx|transformers ./run-captions.sh
 #
 # Press Ctrl+C to stop.
 set -euo pipefail
