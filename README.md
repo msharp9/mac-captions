@@ -1,6 +1,13 @@
 # mac-captions
 
-Live English speech → Spanish captions displayed at the bottom of your screen on macOS, powered by [IBM Granite Speech 4.1-2b](https://huggingface.co/ibm-granite/granite-speech-4.1-2b) running fully on-device via [MLX](https://github.com/ml-explore/mlx).
+Live English speech → Spanish captions displayed at the bottom of your screen on macOS, powered by [IBM Granite Speech 4.1-2b](https://huggingface.co/ibm-granite/granite-speech-4.1-2b) running fully on-device.
+
+Two inference backends are selected automatically by hardware:
+
+- **Apple Silicon** → [MLX](https://github.com/ml-explore/mlx) (GPU-accelerated, fastest)
+- **Intel Macs** → [transformers](https://github.com/huggingface/transformers) + PyTorch on CPU (slower, but works)
+
+Override with `MAC_CAPTIONS_BACKEND=mlx|transformers`.
 
 ```
 mic → Python VAD → Granite (translate) → stdout | Swift overlay → screen
@@ -10,16 +17,16 @@ The caption bar floats above every window — including full-screen apps — and
 
 ## Requirements
 
-- macOS with Apple Silicon (M1 or later)
+- macOS (Apple Silicon **or** Intel)
 - A microphone
-- [uv](https://docs.astral.sh/uv/) for Python dependency management
+- [Pixi](https://pixi.sh/) for dependency management (provides PyTorch for Intel Macs via conda-forge, which PyPI no longer ships)
 - Xcode Command Line Tools (`xcode-select --install`) for the Swift overlay
 
 ## Quick start
 
 ```bash
-# Install Python dependencies
-uv sync
+# Install dependencies (auto-resolves the right backend for your hardware)
+pixi install
 
 # Build the Swift overlay and launch the pipeline
 ./run-captions.sh
@@ -36,7 +43,7 @@ Grant the microphone permission when macOS prompts you (one-time).
 │  Python (mac_captions.live)                           │
 │                                                        │
 │  sounddevice mic  →  webrtcvad  →  Granite Speech 4.1 │
-│  (16 kHz, mono)      (chunking)    (MLX, on-device)   │
+│  (16 kHz, mono)      (chunking)    (MLX or PyTorch)   │
 │                                         │              │
 │                                   stdout (one line     │
 │                                   per segment)         │
@@ -78,39 +85,36 @@ Granite Speech 4.1 supports translation between English and: French (`fr`), Germ
 
 ## Known limitations
 
-- **Latency**: Each segment is translated after it ends. Expect 1–3 s delay depending on segment length and hardware.
-- **macOS only**: MLX and the Swift overlay are Apple-platform specific.
+- **Latency**: Each segment is translated after it ends. Expect 1–3 s delay depending on segment length and hardware. The Intel/CPU (transformers) backend is noticeably slower than MLX on Apple Silicon.
+- **macOS only**: The Swift overlay is Apple-platform specific.
 - **Mic permission**: The first run prompts for microphone access via macOS TCC. Grant it for the terminal app running the pipeline.
 - **Xcode for all-Swift**: The Swift overlay is built with plain `swiftc` (no Xcode needed). A future version will embed the model in-process using [mlx-audio-swift](https://github.com/Blaizzy/mlx-audio-swift), which requires Xcode's Metal toolchain.
 
 ## Setup
 
-This project uses `uv` for dependency management.
+This project uses [Pixi](https://pixi.sh/) for dependency management. Pixi pulls
+PyTorch from conda-forge, which still ships builds for Intel Macs (osx-64) — PyPI
+no longer does, capping Intel-Mac PyTorch at an unusably old version.
 
-1. **Install `uv`**:
+1. **Install Pixi**:
     ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    curl -fsSL https://pixi.sh/install.sh | sh
     ```
 
 2. **Install dependencies**:
     ```bash
-    uv sync
+    pixi install
     ```
 
 ## Contributing
 
 ### Running tests
 ```bash
-uv run pytest
+pixi run test
 ```
 
 ### Linting and formatting
 ```bash
-uv run ruff check .
-uv run ruff format .
-```
-
-### Pre-commit hooks (optional)
-```bash
-uvx prek install
+pixi run ruff check .
+pixi run ruff format .
 ```

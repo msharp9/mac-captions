@@ -5,13 +5,13 @@
 #   ./run-captions.sh
 #
 # Requirements:
-#   - uv venv set up:  uv sync
+#   - Pixi environment set up:  pixi install
 #   - macOS (Apple Silicon or Intel) with a microphone
 #
 # Backend is chosen automatically:
 #   - Apple Silicon (arm64): mlx-audio  (GPU-accelerated)
-#   - Intel (x86_64):        transformers + PyTorch CPU  (slower, but works)
-# Override:  MAC_CAPTIONS_BACKEND=mlx|transformers ./run-captions.sh
+#   - Intel (x86_64):        llama.cpp GGUF  (faster CPU inference)
+# Override:  MAC_CAPTIONS_BACKEND=mlx|llamacpp|transformers ./run-captions.sh
 #
 # Press Ctrl+C to stop.
 set -euo pipefail
@@ -23,4 +23,4 @@ swiftc Sources/CaptionOverlay/main.swift \
     -framework AppKit
 
 echo "Starting pipeline — speak English, see Spanish captions. Ctrl+C to stop."
-PYTHONPATH=src uv run python -m mac_captions.live | .build/caption-overlay
+pixi run captions | .build/caption-overlay

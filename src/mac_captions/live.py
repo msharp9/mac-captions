@@ -2,9 +2,8 @@
 Live English → Spanish caption pipeline.
 
 Captures microphone audio, detects speech segments via WebRTC VAD, translates
-each segment using Granite Speech 4.1 (auto-selects MLX on Apple Silicon or
-HuggingFace transformers on Intel), and writes one caption line per segment
-to stdout.
+each segment using Granite Speech 4.1 (auto-selects backend by hardware), and
+writes one caption line per segment to stdout.
 
 Pipe into the Swift caption overlay:
     mac-captions | ./.build/caption-overlay
@@ -14,9 +13,9 @@ Or run standalone to see raw text output:
 
 The backend is chosen automatically:
   - Apple Silicon (arm64): mlx-audio (fastest, GPU-accelerated)
-  - Intel / other:         transformers + PyTorch CPU
+  - Intel / other:         llama.cpp GGUF (llamacpp backend, faster CPU inference)
 
-Override with: MAC_CAPTIONS_BACKEND=mlx|transformers
+Override with: MAC_CAPTIONS_BACKEND=mlx|llamacpp|transformers
 """
 
 from __future__ import annotations
@@ -31,7 +30,7 @@ import webrtcvad
 from huggingface_hub import snapshot_download
 from huggingface_hub.errors import LocalEntryNotFoundError
 
-from mac_captions.backends import load_backend
+from mac_captions.backends import detect_backend, load_backend
 from mac_captions.pipeline import (
     FRAME_BYTES,
     FRAME_SAMPLES,
@@ -161,7 +160,11 @@ def run() -> None:
             callback=audio_callback,
         ):
             # Load the model on this thread (required by the MLX GPU stream constraint).
-            backend = load_backend(_resolve_model_path())
+            # The llamacpp backend self-resolves its GGUF files; skip the transformers
+            # snapshot download so the 2 GB transformers weights aren't fetched on Intel.
+            _backend_name = detect_backend()
+            _model_path = _resolve_model_path() if _backend_name in ("mlx", "transformers") else ""
+            backend = load_backend(_model_path)
             _segmenter_loop(backend, frame_queue)
     except KeyboardInterrupt:
         print("\nStopped.", file=sys.stderr, flush=True)
