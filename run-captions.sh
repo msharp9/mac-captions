@@ -5,7 +5,7 @@
 #   ./run-captions.sh
 #
 # Requirements:
-#   - uv venv set up:  uv sync
+#   - Pixi environment set up:  pixi install
 #   - macOS (Apple Silicon or Intel) with a microphone
 #
 # Backend is chosen automatically:
@@ -23,4 +23,4 @@ swiftc Sources/CaptionOverlay/main.swift \
     -framework AppKit
 
 echo "Starting pipeline — speak English, see Spanish captions. Ctrl+C to stop."
-PYTHONPATH=src uv run python -m mac_captions.live | .build/caption-overlay
+pixi run captions | .build/caption-overlay
