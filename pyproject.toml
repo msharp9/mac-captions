@@ -51,11 +51,14 @@ fail_under = 80
 # ---------------------------------------------------------------------------
 [tool.pixi.workspace]
 channels = ["conda-forge"]
+platforms = ["osx-64", "osx-arm64"]
+
 # mlx wheels (Apple Silicon) require macOS >= 14; default Pixi assumes 13.0.
-platforms = [
-    "osx-64",
-    { platform = "osx-arm64", macos = "14.0" },
-]
+# Intel (osx-64) keeps the 13.0 default. Set per-target rather than via an
+# inline-table in the platforms array — that mixed-type array is valid pixi
+# but breaks setup-pixi's TOML parser in CI.
+[tool.pixi.target.osx-arm64.system-requirements]
+macos = "14.0"
 
 # Native deps from conda-forge — available on both platforms.
 # pytorch/torchaudio are left unpinned: Pixi solves each platform independently
