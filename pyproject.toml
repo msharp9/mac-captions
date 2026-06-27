@@ -1,7 +1,7 @@
 [project]
 name = "mac-captions"
 version = "0.1.0"
-description = "Live English speech → Spanish captions on macOS using Granite Speech 4.1 (MLX on Apple Silicon, transformers/PyTorch on Intel)"
+description = "Live English speech → Spanish captions on macOS using Granite Speech 4.1 (MLX on Apple Silicon, llama.cpp GGUF on Intel)"
 readme = "README.md"
 requires-python = ">=3.12"
 
@@ -35,9 +35,15 @@ fail_under = 80
 # ---------------------------------------------------------------------------
 # Pixi — package manager / environment.
 #
+# Backend by platform:
+#   osx-arm64 (Apple Silicon): mlx-audio — GPU-accelerated via Metal
+#   osx-64    (Intel macOS):   llama.cpp + Granite Speech GGUF — faster CPU
+#                              inference than PyTorch CPU float32
+#
 # conda-forge provides PyTorch for Intel macOS (osx-64), which PyPI no longer
 # does (PyPI caps Intel-Mac torch at 2.2.2).  conda-forge ships py312 PyTorch
-# builds for BOTH osx-64 and osx-arm64, so one Python version works everywhere.
+# builds for BOTH osx-64 and osx-arm64.  conda-forge also ships an
+# Accelerate-optimized llama.cpp build for osx-64 (satisfies b9045 requirement).
 #
 # Setup:   pixi install
 # Run:     pixi run captions   (or ./run-captions.sh)
@@ -74,6 +80,12 @@ webrtcvad-wheels = "*"
 # MLX backend — Apple Silicon only (GPU-accelerated default on arm64).
 [tool.pixi.target.osx-arm64.pypi-dependencies]
 mlx-audio = ">=0.4.1"
+
+# llama.cpp backend — Intel macOS only (Accelerate-optimized, satisfies b9045).
+# The llamacpp backend is the default on osx-64; transformers/PyTorch remains
+# selectable via MAC_CAPTIONS_BACKEND=transformers as a fallback.
+[tool.pixi.target.osx-64.dependencies]
+"llama.cpp" = "*"
 
 [tool.pixi.tasks]
 captions = { cmd = "python -m mac_captions.live", env = { PYTHONPATH = "src" } }

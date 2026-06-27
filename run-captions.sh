@@ -10,8 +10,8 @@
 #
 # Backend is chosen automatically:
 #   - Apple Silicon (arm64): mlx-audio  (GPU-accelerated)
-#   - Intel (x86_64):        transformers + PyTorch CPU  (slower, but works)
-# Override:  MAC_CAPTIONS_BACKEND=mlx|transformers ./run-captions.sh
+#   - Intel (x86_64):        llama.cpp GGUF  (faster CPU inference)
+# Override:  MAC_CAPTIONS_BACKEND=mlx|llamacpp|transformers ./run-captions.sh
 #
 # Press Ctrl+C to stop.
 set -euo pipefail
