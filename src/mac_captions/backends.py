@@ -35,8 +35,39 @@ import numpy as np
 
 from mac_captions.pipeline import SAMPLE_RATE, postprocess_text
 
-LANGUAGE = "es"  # ISO 639-1 code — used by the MLX backend
-LANGUAGE_NAME = "Spanish"  # full name — used in chat-template / llama-server prompts
+# Target caption languages supported by Granite Speech 4.1.
+# Maps ISO 639-1 code → full English name used in chat-template / llama-server prompts.
+SUPPORTED_LANGUAGES = {
+    "en": "English",
+    "es": "Spanish",
+    "de": "German",
+    "fr": "French",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ja": "Japanese",
+    "zh": "Chinese",
+}
+
+
+def _resolve_language() -> tuple[str, str]:
+    """Return (iso_code, full_name) for the target caption language.
+
+    Controlled by MAC_CAPTIONS_LANG (ISO 639-1 code); defaults to Spanish.
+    Falls back to Spanish with a warning if the code is unrecognised.
+    """
+    code = os.environ.get("MAC_CAPTIONS_LANG", "es").strip().lower()
+    if code in SUPPORTED_LANGUAGES:
+        return code, SUPPORTED_LANGUAGES[code]
+    print(
+        f"[lang] unknown MAC_CAPTIONS_LANG={code!r}; "
+        f"must be one of {', '.join(sorted(SUPPORTED_LANGUAGES))}. Falling back to 'es'.",
+        file=sys.stderr,
+        flush=True,
+    )
+    return "es", SUPPORTED_LANGUAGES["es"]
+
+
+LANGUAGE, LANGUAGE_NAME = _resolve_language()  # ISO code + full name for the target language
 
 # GGUF repo constants — used by LlamaCppBackend
 GGUF_MODEL_ID = "ibm-granite/granite-speech-4.1-2b-GGUF"
@@ -175,9 +206,13 @@ class MlxBackend:  # pragma: no cover
 
     def translate(self, pcm_int16: np.ndarray) -> str:
         audio_f32 = pcm_int16.astype(np.float32) / 32768.0
+        # Pass an explicit full-name prompt rather than `language=LANGUAGE`.
+        # mlx-audio's built-in LANGUAGE_CODES map omits some languages (e.g. zh, it),
+        # so a bare code falls through as "Translate the speech to zh." — which the
+        # model ignores and transcribes in English. The prompt path works for all.
         out = self._model.generate(
             audio_f32,
-            language=LANGUAGE,
+            prompt=f"Translate the speech to {LANGUAGE_NAME}.",
             temperature=0.0,
             max_tokens=100,
             verbose=False,
