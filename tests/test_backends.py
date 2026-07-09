@@ -3,6 +3,11 @@ Unit tests for mac_captions.backends.detect_backend().
 
 detect_backend() is pure (no hardware, no heavy imports) and therefore
 safe to run in CI on any platform.
+
+Auto-detect results by platform:
+  arm64   → 'mlx'
+  x86_64  → 'llamacpp'  (Intel macOS default; was 'transformers' before GGUF support)
+  other   → 'llamacpp'
 """
 
 from __future__ import annotations
@@ -31,6 +36,13 @@ def test_env_var_transformers(monkeypatch):
     from mac_captions.backends import detect_backend
 
     assert detect_backend() == "transformers"
+
+
+def test_env_var_llamacpp(monkeypatch):
+    monkeypatch.setenv("MAC_CAPTIONS_BACKEND", "llamacpp")
+    from mac_captions.backends import detect_backend
+
+    assert detect_backend() == "llamacpp"
 
 
 def test_env_var_case_insensitive(monkeypatch):
@@ -65,13 +77,13 @@ def test_autodetect_x86_64(monkeypatch):
     with patch("platform.machine", return_value="x86_64"):
         from mac_captions.backends import detect_backend
 
-        assert detect_backend() == "transformers"
+        assert detect_backend() == "llamacpp"
 
 
 def test_autodetect_unknown_arch(monkeypatch):
-    """Any non-arm64 machine falls back to the transformers backend."""
+    """Any non-arm64 machine falls back to the llamacpp backend."""
     monkeypatch.delenv("MAC_CAPTIONS_BACKEND", raising=False)
     with patch("platform.machine", return_value="riscv64"):
         from mac_captions.backends import detect_backend
 
-        assert detect_backend() == "transformers"
+        assert detect_backend() == "llamacpp"
